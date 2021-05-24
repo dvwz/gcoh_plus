@@ -1,5 +1,4 @@
-# gcoh+  
-Global Coherence Toolbox Plus  
+# gcoh+: Global Coherence Toolbox Plus  
 Version 0.0.1  
 Date last modified:  
 Authors:  

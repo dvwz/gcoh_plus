@@ -1,4 +1,4 @@
-%GCOH_PLUS Top-level function of the gcoh2 toolbox
+%GCOH_PLUS Top-level function of the gcoh+ toolbox
 % Description:
 %    Could be a wrapper function, or object-oriented class method
 %    Desired functionality: creates output data path, calls all versions of
@@ -14,7 +14,8 @@
 %    data - time series (in form nsamples x nchannels)
 %    movingwin - (in the form [window winstep])
 %    epoch - (in the form [tstart tend], or a nsegs x 2 array, or [])
-%    params - structure with fields tapers, Fs, fpass, ...
+%    mtparams - structure with fields of multitaper params such as
+%        tapers, Fs, fpass, etc
 %    gcohparams (optional) - structure with fields savedir, outputdir,
 %        infmethod ('none', 'bootstrap', 'null'), parallel (boolean),
 %        niter, 
@@ -43,7 +44,7 @@
 function [outputs,varargout] = gcoh_plus(data, ...
                                          movingwin, ...
                                          epoch, ...
-                                         params, ...
+                                         mtparams, ...
                                          gcohparams)
 
 %% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -51,18 +52,18 @@ function [outputs,varargout] = gcoh_plus(data, ...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
  
 % PARAMS
-if ~isstruct(params)
+if ~isstruct(mtparams)
     error('gcoh2:paramsstruct','Error:  params must be a structure.')
-elseif ~isfield(params, 'Fs')
+elseif ~isfield(mtparams, 'Fs')
     error('gcoh2:missingFs','Error:  Please enter a value for params.Fs')
 end
 
 % default multitaper parameters for Chronux
-if ~isfield(params, 'pad'); params.pad = 0; end
-if ~isfield(params, 'tapers'); params.tapers = [3 2]; end
-if ~isfield(params, 'fpass'); params.fpass = [0,(Fs/2)]; end
-if ~isfield(params, 'err'); params.err = 0; end
-if ~isfield(params, 'trialave'); params.trialave = 0; end
+if ~isfield(mtparams, 'pad'); mtparams.pad = 0; end
+if ~isfield(mtparams, 'tapers'); mtparams.tapers = [3 2]; end
+if ~isfield(mtparams, 'fpass'); mtparams.fpass = [0,(Fs/2)]; end
+if ~isfield(mtparams, 'err'); mtparams.err = 0; end
+if ~isfield(mtparams, 'trialave'); mtparams.trialave = 0; end
 
 % GCOHPARAMS
 if ~isstruct(gcohparams)
@@ -84,50 +85,12 @@ if ~isfield(gcohparams, 'niter')
 end
 if ~isfield(gcohparams, 'parallel'); gcohparams.parallel = 0; end
 
-% %INPUT ERRORS
-% if inputerror1
-%     error('gcoh2:inputError','Error:  Message goes here.');
-% end
-% 
-% %GLOBAL VARIABLES
-% globalvar1=some_value;
-% globalvar2=some_other_value;
-% 
-% %OTHER INPUT PROCESSING
-%     %insert here
 
 
 %% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% MAIN BODY %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-try 
-    %PROCEDURE 1 NAME
-    %code goes here
-catch err
-        % issue a warning
-    warning('gcoh2:warningType',...
-        ['Warning: The following went wrong in Procedure 1 Name --\n' err.message ]);
-    %error handling code here
-
-        % or issue an error & exit function:
-    error('gcoh2:errorType',...
-        ['Error: The following went wrong in Procedure 1 Name --\n' err.message ]);
-end
-
-try
-    %PROCEDURE 2 NAME
-    %code goes here
-catch err
-        % issue a warning
-    warning('gcoh2:warningType',...
-        ['Warning: The following went wrong in Procedure 2 Name --\n' err.message ]);
-    %error handling code here
-
-        % or issue an error & exit function:
-    error('gcoh2:errorType',...
-        ['Error: The following went wrong in Procedure 2 Name --\n' err.message ]);
-end
 
 
 %---------------------------------------

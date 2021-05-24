@@ -24,7 +24,7 @@
 %
 % See also: OTHER_FUNCTION_NAME1,  OTHER_FUNCTION_NAME2
 %
-% Copyright Apr-2020, Veronica Weiner, vsw@alum.mit.edu
+% Copyright Apr-2020, David Zhou, dwzhou@mit.edu
 % Last revision 06-Apr-2020
 %------------------------------------------------
  
