@@ -149,7 +149,7 @@ data_chunk = detrend(data(1:mwFs(1),:));
 
 fprintf('Computing multi-taper cross-spectrum...');
 [Pxy,freqs] = pkmtxsptrm(data_chunk,mtparams);
-Nfreq = numel(freqs); frequencies = 1:Nfreq;
+Nfreqs = numel(freqs); frequencies = 1:Nfreqs;
 % preallocate Pxy with Nfreqs x Ntapers x Nchans x Nchans x Nmw
 Pxy(end,end,end,end,Nmw) = zeros(1,1,'like',complex(0)); 
 
@@ -183,38 +183,91 @@ switch gcohparams.inference
 end
 
 %---------------------------------------
+% BOOTSTRAP CROSS-SPECTRA 
+% IF INFERENCE METHOD IS FDB, 
+% ELSE MEAN ACROSS TAPERS
+%---------------------------------------
+
+if strcmp(gcohparams.inference,'fdb')
+    
+    fprintf('Computing FDB... ')
+    
+    bootPxy = nan([Nfreqs Nchan Nchan Nmw*Niter],'like',complex(0));
+    
+    for ff = 1:Nfreqs
+        bootPxy(ff,:,:,:) = fdb_mtx(squeeze(Pxy(ff,:,:,:,:),Niter,gcohparams.version);
+    end
+    clear Pxy
+    Pxy = bootPxy; clear bootPxy
+    
+    disp('Done.')
+    
+elseif strcmp(gcohparams.inference,'none')
+    
+    fprintf('Computing mean across tapers... ')
+    
+    Pxy = squeeze(mean(Pxy,2)); % becomes Nfreqs x Nchans x Nchans x Nmw
+    
+    disp('Done.')
+    
+end
+
+%---------------------------------------
+% RESHAPE CROSS-SPECTRA
+%---------------------------------------
+
+if strcmp(gcohparams.inference,'none')
+    
+    Pxy_reshape = zeros(Nchans,Nchans,Nfreqs*Nmw);
+    c=1;
+    for qq = 1:Nmw
+        for loopfreq = frequencies
+            Pxy_reshape(:,:,c)=squeeze(Pxy(loopfreq,:,:,qq));
+            c=c+1;
+        end
+    end
+    clear Pxy;
+    
+elseif strcmp(gcohparams.inference,'fdb')
+    
+    Pxy_reshape = zeros(Nchans,Nchans,Nfreqs*Nmw*Niter);
+    c=1;
+    for qq = 1:Nmw
+        for loopfreq = frequencies
+            Pxy_reshape(:,:,c)=squeeze(Pxy(loopfreq,:,:,qq));
+            c=c+1;
+        end
+    end
+    clear Pxy;
+    
+end 
+
+fprintf('Computing eigendecompositions... ')
+%---------------------------------------
 % RUN WINDOWED VERSION, NO FDB
 %---------------------------------------
 
-if strcmp(gcohparams.version,'window') && strcmp(gcohparams.inference,'none')
-    
-end
+
 
 %---------------------------------------
 % RUN WINDOWED VERSION WITH FDB
 %---------------------------------------
 
-if strcmp(gcohparams.version,'window') && strcmp(gcohparams.inference,'fdb')
-    
-end
+
 
 %---------------------------------------
 % RUN EPOCHED VERSION, NO FDB
 %---------------------------------------
 
-if strcmp(gcohparams.version,'epoch') && strcmp(gcohparams.inference,'none')
-    
-end
+
 
 %---------------------------------------
 % RUN EPOCHED VERSION WITH FDB
 %---------------------------------------
 
-if strcmp(gcohparams.version,'epoch') && strcmp(gcohparams.inference,'fdb')
-    
-end
 
 
+disp('Done.')
 
 %---------------------------------------
 % END CODE
