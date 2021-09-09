@@ -21,10 +21,9 @@
 %        parallel ('true' | 'false'), Niter
 %
 % Outputs:
-%    eigvecs_l - left eigenvectors (in form nchannels x nchannels)
-%    eigvecs_r - right eigenvectors (in form nchannels x nchannels)
-%    eigvals - eigenvalues (in form nchannels x 1)
-%    gcohmat - global coherence spectrum or time-frequency plot
+%    eigenvectors_l - left eigenvectors (in form nchannels x nchannels)
+%    eigenvectors_r - right eigenvectors (in form nchannels x nchannels)
+%    eigenvalues - eigenvalues (in form nchannels x 1)
 %    times - time axis vector for plotting
 %    freqs - frequency axis vector for plotting
 %
@@ -42,15 +41,10 @@
 % Last revision 06-Apr-2020
 %------------------------------------------------
 
-function [eigvecs_l,...
-          eigvecs_r,...
-          eigvals,...
-          gcohmat,...
-          T_out,...
-          freqs]             = gcoh_plus(data, ...
-                                         epochs, ...
-                                         mtparams, ...
-                                         gcohparams)
+function gcohout = gcoh_plus(data, ...
+                             epochs, ...
+                             mtparams, ...
+                             gcohparams)
 %% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% PROCESS INPUTS %%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -89,7 +83,7 @@ if ~isfield(gcohparams, 'outputdir'); gcohparams.outputdir = pwd; end
 if ~isfield(gcohparams, 'inference'); gcohparams.inference = 'none'; end
 if ~isfield(gcohparams, 'version'); gcohparams.version = 'window'; end
 if ~isfield(gcohparams, 'Niter')
-    switch gcohparams.infmethod
+    switch gcohparams.inference
         case 'none' % just one svd per mtx
             gcohparams.Niter = 1;
         case 'fdb' % frequency domain bootstrap
@@ -106,39 +100,46 @@ assert(size(data,1) > mwFs(1)) % the data almost always has to be larger in samp
 Nchans = size(data,2); % number of channels
 
 % check T
-T_samples = 1:size(data,1);
-T_sec = T_samples ./ mtparams.Fs; % creates time vector of samples in seconds
-if isempty('epochs')
-    T_data = T_samples(1:mwFs(2):end);
-    T_out = T_sec(1:mwFs(2):end); % creates time vector of gcoh outputs in seconds
+T_samples = 1:size(data,1); % vector of sample indices
+T_sec = T_samples ./ mtparams.Fs; % time vector of samples in seconds
+if isempty(epochs)
+    T_winstart = T_samples(1:mwFs(2):end-mwFs(1)); % vector of window start indices
+    T_secout = T_sec(1:mwFs(2):end-mwFs(1)); % time vector of gcoh outputs in seconds
 elseif size(epochs,2) == 2
-    T_data = [];
-    T_out = [];
+    T_winstart = [];
+    T_secout = [];
     for e = 1:size(epochs,1)
         s_start = ceil(epochs(e,1)*mtparams.Fs); % the sample that the epoch should be started
         s_end = floor(epochs(e,2)*mtparams.Fs); % the sample the the epoch should be ended
-        T_data = [T_data (s_start:mwFs(2):s_end)];
-        T_out = [T_out ((s_start:mwFs(2):s_end) ./ mtparams.Fs)];
+        T_winstart = [T_winstart (s_start:mwFs(2):s_end-mwFs(1))];
+        T_secout = [T_secout ((s_start:mwFs(2):s_end-mwFs(1)) ./ mtparams.Fs)];
     end
 end
 
-Nmw = length(T_out); % number of moving windows
+Nmw = length(T_winstart); % number of moving windows
+times = T_secout;
+
+%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% INIT OUTPUTS %%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+gcohout = struct;
 
 %% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% MAIN BODY %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %---------------------------------------
-% CUT OUT DATA WINDOWS 
+% CUT OUT DATA WINDOWS FOR EPOCHS
 %---------------------------------------
 
 data_windowed = nan(Nmw*mwFs(1),Nchans);
 di = 1;
-for e = 1:length(T_data)
-    data_windowed(di:di+mwFs(1)-1,:) = data(T_data(e):mwFs(1),:);
+for e = 1:length(T_winstart)
+    data_windowed(di:di+mwFs(1)-1,:) = data(T_winstart(e):T_winstart(e)+mwFs(1)-1,:);
     di = di + mwFs(1);
 end
-data = data_windowed; clear data_epoched;
+data = data_windowed; clear data_windowed;
 
 %---------------------------------------
 % COMPUTE CROSS-SPECTRUM WITH ALL TAPERS
@@ -147,7 +148,7 @@ data = data_windowed; clear data_epoched;
 % first chunk of data, linear detrend
 data_chunk = detrend(data(1:mwFs(1),:));
 
-fprintf('Computing multi-taper cross-spectrum...');
+fprintf('Computing multitaper cross-spectrum... ');
 [Pxy,freqs] = pkmtxsptrm(data_chunk,mtparams);
 Nfreqs = numel(freqs); frequencies = 1:Nfreqs;
 % preallocate Pxy with Nfreqs x Ntapers x Nchans x Nchans x Nmw
@@ -192,10 +193,10 @@ if strcmp(gcohparams.inference,'fdb')
     
     fprintf('Computing FDB... ')
     
-    bootPxy = nan([Nfreqs Nchan Nchan Nmw*Niter],'like',complex(0));
+    bootPxy = nan([Nfreqs Nchans Nchans Nmw*Niter],'like',complex(0));
     
     for ff = 1:Nfreqs
-        bootPxy(ff,:,:,:) = fdb_mtx(squeeze(Pxy(ff,:,:,:,:),Niter,gcohparams.version);
+        bootPxy(ff,:,:,:) = fdb_mtx(squeeze(Pxy(ff,:,:,:,:),Niter,gcohparams.version));
     end
     clear Pxy
     Pxy = bootPxy; clear bootPxy
@@ -213,16 +214,16 @@ elseif strcmp(gcohparams.inference,'none')
 end
 
 %---------------------------------------
-% RESHAPE CROSS-SPECTRA
+% RESHAPE CROSS-SPECTRA TO 3 DIMS
 %---------------------------------------
 
 if strcmp(gcohparams.inference,'none')
     
-    Pxy_reshape = zeros(Nchans,Nchans,Nfreqs*Nmw);
+    Pxy_reshaped = zeros(Nchans,Nchans,Nfreqs*Nmw);
     c=1;
     for qq = 1:Nmw
         for loopfreq = frequencies
-            Pxy_reshape(:,:,c)=squeeze(Pxy(loopfreq,:,:,qq));
+            Pxy_reshaped(:,:,c)=squeeze(Pxy(loopfreq,:,:,qq));
             c=c+1;
         end
     end
@@ -230,11 +231,11 @@ if strcmp(gcohparams.inference,'none')
     
 elseif strcmp(gcohparams.inference,'fdb')
     
-    Pxy_reshape = zeros(Nchans,Nchans,Nfreqs*Nmw*Niter);
+    Pxy_reshaped = zeros(Nchans,Nchans,Nfreqs*Nmw*Niter);
     c=1;
     for qq = 1:Nmw
         for loopfreq = frequencies
-            Pxy_reshape(:,:,c)=squeeze(Pxy(loopfreq,:,:,qq));
+            Pxy_reshaped(:,:,c)=squeeze(Pxy(loopfreq,:,:,qq));
             c=c+1;
         end
     end
@@ -244,30 +245,72 @@ end
 
 fprintf('Computing eigendecompositions... ')
 %---------------------------------------
-% RUN WINDOWED VERSION, NO FDB
+% RUN WINDOWED VERSION, NO FDB -- do first
+%---------------------------------------
+
+diags = zeros(Nchans, length(Pxy_reshaped));
+eigvecs_r = zeros(Nchans,Nchans,length(Pxy_reshaped));
+eigvecs_l = zeros(Nchans,Nchans,length(Pxy_reshaped));
+nandat = find(squeeze(any(any(isnan(Pxy_reshaped),1),2))); % improve
+
+for i = 1:size(Pxy_reshaped,3)
+    
+    if ismember(i,nandat)
+        continue
+    end
+    
+    [U,S,V] = eig(Pxy_reshaped(:,:,i)); % such that U*S*V' = Pxy
+    [diags(:,i), svorder] = sort(diag(S),'descend');
+    U = U(:,svorder);
+    V = V(:,svorder);
+    eigvecs_r(:,:,i) = U;
+    eigvecs_l(:,:,i) = V;
+    
+end
+
+
+eigenvalues = nan(Nmw,Nfreqs,Nchans);
+eigenvectors_l = nan(Nmw,Nfreqs,Nchans,Nchans);
+eigenvectors_r = nan(Nmw,Nfreqs,Nchans,Nchans);
+c=1;
+for qq = 1:Nmw
+    for loopfreq = frequencies
+        eigenvalues(qq,loopfreq,:) = diags(:,c);
+        eigenvectors_l(qq,loopfreq,:,:)=eigvecs_l(:,:,c);
+        eigenvectors_r(qq,loopfreq,:,:)=eigvecs_r(:,:,c);
+        c=c+1;
+    end
+end
+
+%---------------------------------------
+% RUN WINDOWED VERSION WITH npFDB -- do third
 %---------------------------------------
 
 
 
 %---------------------------------------
-% RUN WINDOWED VERSION WITH FDB
+% RUN EPOCHED VERSION, NO FDB -- do last or not at all
 %---------------------------------------
 
 
 
 %---------------------------------------
-% RUN EPOCHED VERSION, NO FDB
-%---------------------------------------
-
-
-
-%---------------------------------------
-% RUN EPOCHED VERSION WITH FDB
+% RUN EPOCHED VERSION WITH npFDB -- do second
 %---------------------------------------
 
 
 
 disp('Done.')
+
+%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% SET OUTPUTS %%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+gcohout.eigenvalues = eigenvalues;
+gcohout.eigenvectors_r = eigenvectors_r;
+gcohout.eigenvectors_l = eigenvectors_l;
+gcohout.times = times;
+gcohout.freqs = freqs;
 
 %---------------------------------------
 % END CODE
