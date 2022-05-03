@@ -17,7 +17,8 @@
 %    mtparams - structure with fields of multitaper params such as
 %        tapers, Fs, fpass, etc
 %    gcohparams (optional) - structure with fields savedir, outputdir,
-%        version ('epoch', 'window'), inference ('none', 'fdb', 'null'), 
+%        version ('epoch': average across time samples, 'window': per
+%        multitaper time window), inference ('none', 'fdb', 'null'), 
 %        parallel ('true' | 'false'), Niter
 %
 % Outputs:
@@ -248,57 +249,67 @@ fprintf('Computing eigendecompositions... ')
 % RUN WINDOWED VERSION, NO FDB -- do first
 %---------------------------------------
 
-diags = zeros(Nchans, length(Pxy_reshaped));
-eigvecs_r = zeros(Nchans,Nchans,length(Pxy_reshaped));
-eigvecs_l = zeros(Nchans,Nchans,length(Pxy_reshaped));
-nandat = find(squeeze(any(any(isnan(Pxy_reshaped),1),2))); % improve
+if strcmp(gcohparams.inference,'none') && strcmp(gcohparams.version,'window')
 
-for i = 1:size(Pxy_reshaped,3)
-    
-    if ismember(i,nandat)
-        continue
+    diags = zeros(Nchans, length(Pxy_reshaped));
+    eigvecs_r = zeros(Nchans,Nchans,length(Pxy_reshaped));
+    eigvecs_l = zeros(Nchans,Nchans,length(Pxy_reshaped));
+    nandat = find(squeeze(any(any(isnan(Pxy_reshaped),1),2))); % improve
+
+    for i = 1:size(Pxy_reshaped,3)
+
+        if ismember(i,nandat)
+            continue
+        end
+
+        [U,S,V] = eig(Pxy_reshaped(:,:,i)); % such that U*S*V' = Pxy
+        [diags(:,i), svorder] = sort(diag(S),'descend');
+        U = U(:,svorder);
+        V = V(:,svorder);
+        eigvecs_r(:,:,i) = U;
+        eigvecs_l(:,:,i) = V;
+
     end
-    
-    [U,S,V] = eig(Pxy_reshaped(:,:,i)); % such that U*S*V' = Pxy
-    [diags(:,i), svorder] = sort(diag(S),'descend');
-    U = U(:,svorder);
-    V = V(:,svorder);
-    eigvecs_r(:,:,i) = U;
-    eigvecs_l(:,:,i) = V;
-    
-end
 
 
-eigenvalues = nan(Nmw,Nfreqs,Nchans);
-eigenvectors_l = nan(Nmw,Nfreqs,Nchans,Nchans);
-eigenvectors_r = nan(Nmw,Nfreqs,Nchans,Nchans);
-c=1;
-for qq = 1:Nmw
-    for loopfreq = frequencies
-        eigenvalues(qq,loopfreq,:) = diags(:,c);
-        eigenvectors_l(qq,loopfreq,:,:)=eigvecs_l(:,:,c);
-        eigenvectors_r(qq,loopfreq,:,:)=eigvecs_r(:,:,c);
-        c=c+1;
+    eigenvalues = nan(Nmw,Nfreqs,Nchans);
+    eigenvectors_l = nan(Nmw,Nfreqs,Nchans,Nchans);
+    eigenvectors_r = nan(Nmw,Nfreqs,Nchans,Nchans);
+    c=1;
+    for qq = 1:Nmw
+        for loopfreq = frequencies
+            eigenvalues(qq,loopfreq,:) = diags(:,c);
+            eigenvectors_l(qq,loopfreq,:,:)=eigvecs_l(:,:,c);
+            eigenvectors_r(qq,loopfreq,:,:)=eigvecs_r(:,:,c);
+            c=c+1;
+        end
     end
-end
 
 %---------------------------------------
 % RUN WINDOWED VERSION WITH npFDB -- do third
 %---------------------------------------
 
-
-
+elseif strcmp(gcohparams.inference,'fdb') && strcmp(gcohparams.version,'window')
+        
+    
+    
 %---------------------------------------
 % RUN EPOCHED VERSION, NO FDB -- do last or not at all
 %---------------------------------------
 
-
+%elseif strcmp(gcohparams.inference,'none') && strcmp(gcohparams.version,'epoch')
+        
+    
 
 %---------------------------------------
 % RUN EPOCHED VERSION WITH npFDB -- do second
 %---------------------------------------
 
+%elseif strcmp(gcohparams.inference,'fdb') && strcmp(gcohparams.version,'epoch')
+        
+    
 
+end
 
 disp('Done.')
 
