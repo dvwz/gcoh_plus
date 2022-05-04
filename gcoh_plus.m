@@ -15,16 +15,16 @@
 %    epoch - times of epoch segments, in seconds (in the form 
 %        [tstart tend], or a nsegs x 2 array, or [])
 %    mtparams - structure with fields of multitaper params such as
-%        tapers, Fs, fpass, etc
+%        tapers, Fs, fpass, etc, as used by Chronux
 %    gcohparams (optional) - structure with fields savedir, outputdir,
 %        version ('epoch': average across time samples, 'window': per
 %        multitaper time window), inference ('none', 'fdb', 'null'), 
 %        parallel ('true' | 'false'), Niter
 %
 % Outputs:
-%    eigenvectors_l - left eigenvectors (in form nchannels x nchannels)
-%    eigenvectors_r - right eigenvectors (in form nchannels x nchannels)
-%    eigenvalues - eigenvalues (in form nchannels x 1)
+%    eigenvectors_l - left eigenvectors (in form Nchans x Nchans x ...)
+%    eigenvectors_r - right eigenvectors (in form Nchans x Nchans x ...)
+%    eigenvalues - eigenvalues (in form Nchans x ...)
 %    times - time axis vector for plotting
 %    freqs - frequency axis vector for plotting
 %
@@ -33,13 +33,13 @@
 %    Line 2 of example
 %    Line 3 of example
 %
-% Other m-files required: none
-% Other requirements: none
+% Other m-files required: functions of gcoh_plus library
+% Other requirements: Chronux toolbox
 %
-% See also: gcoh.m
+% See also: gcoh.m, Observed Brain Dynamics (2008)
 %
 % Copyright Apr-2020, David Zhou, dwzhou@mit.edu
-% Last revision 06-Apr-2020
+% Last revision 03-May-2022
 %------------------------------------------------
 
 function gcohout = gcoh_plus(data, ...
