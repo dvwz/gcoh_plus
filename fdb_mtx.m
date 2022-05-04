@@ -3,108 +3,97 @@
 %Optional file header info (to give more details about the function than one line)
 %
 % Usage:  
-%    [output1,output2] = fdbmtxsptrm(input1)
-%    [output1,output2] = fdbmtxsptrm(input1,input2)
+%    Pxy_out = fdb_mtx(Pxy, Niter, version)
 %
 % Inputs:
-%    input1 - Description
-%    input2 - Description
+%    Pxy - Cross-spectral estimates, in the form Ntapers x Nchans x Nchans x Nmw
+%    Niter - Number of bootstrap iterations to perform
+%    version - 'epoch', median across time, or 'window', does not
 %
 % Outputs:
-%    output1 - Description
-%    output2 - Description
-%
-% Example: 
-%    Line 1 of example
-%    Line 2 of example
-%    Line 3 of example
+%    Pxy_out - Averaged cross-spectral replicates. If version is 'epoch',
+%       takes the form Nchans x Nchans x Niter. If version is 'window', takes
+%       the form Nchanx x Nchans x Nmw*Niter.
 %
 % Other m-files required: none
 % Other requirements: none
 %
-% See also: OTHER_FUNCTION_NAME1,  OTHER_FUNCTION_NAME2
+% See also: bootstrap_mtxsptrm.m (intracranial)
 %
 % Copyright Apr-2020, David Zhou, dwzhou@mit.edu
 % Last revision 06-Apr-2020
 %------------------------------------------------
  
-function [outputs,varargout] = fdb_mtx(inputs,varargin)
+function Pxys_out = fdb_mtx(Pxys, Niter, version)
 
 %---------------------------------------
 % PROCESS INPUTS
 %---------------------------------------
- 
-%VARARGIN
-switch length(varargin)
-    case 1
-        newvar1=varargin{1};
-    case 2
-        newvar1=varargin{1};
-        newvar2=varargin{2};
-   otherwise
-        newvar1=[];
-        newvar2=[];
+
+% size parameters
+if ~exist('Niter','var') || isempty(Niter)
+    Niter = 1000;
+end
+Nchans = size(Pxys,2);
+Ntapers = size(Pxys,1);
+
+% remove nan times
+tpos_nonnan = ~isnan(Pxys(1,1,1,:));
+Pxys = Pxys(:,:,:,tpos_nonnan);
+Nmw = size(Pxys,4);
+
+% init output
+switch version
+    case 'window'
+        Pxys_out = nan(Nchans,Nchans,Nmw*Niter);
+    case 'epoch'
+        Pxys_out = nan(Nchans,Nchans,Niter);
 end
 
-%VARARGOUT
-switch length(varargout)
-    case 1
-        execute_procedure1=1;
-    case 2
-        execute_procedure1=1;
-        execute_procedure2=1;
-end
+% random seed
+rng(1,'twister');
 
-%INPUT ERRORS
-if inputerror1
-    error('fdbmtxsptrm:inputError','Error:  Message goes here.');
-end
-
-%GLOBAL VARIABLES
-globalvar1=some_value;
-globalvar2=some_other_value;
-
-%OTHER INPUT PROCESSING
-    %insert here
-
+% populate rands
+resample_tapers = randi(Ntapers,Ntapers,Niter);
 
 %---------------------------------------
-% MAIN BODY OF FUNCTION
+% COMPILE REPLICATES
 %---------------------------------------
 
-try 
-    %PROCEDURE 1 NAME
-    %code goes here
-catch err
-        % issue a warning
-    warning('fdbmtxsptrm:warningType',...
-        ['Warning: The following went wrong in Procedure 1 Name --\n' err.message ]);
-    %error handling code here
+switch version
+    
+    case 'window'
+        
+        c=1;
+        for i = 1:Niter
+            for mw = 1:Nmw
+            
+                replPxy = Pxys(resample_tapers(:,i),:,:,mw); % sample Pxys
+                replPxy = squeeze(mean(replPxy,1)); % average over tapers
 
-        % or issue an error & exit function:
-    error('fdbmtxsptrm:errorType',...
-        ['Error: The following went wrong in Procedure 1 Name --\n' err.message ]);
+                Pxys_out(:,:,c) = replPxy;
+                c=c+1;
+            
+            end
+        end
+    
+    case 'epoch'
+        
+        % populate tpos rands
+        resample_tpos = randi(Nmw,Nmw,Niter);
+
+        for i = 1:Niter
+
+            replPxy = Pxys(resample_tapers(:,i),:,:,resample_tpos(:,i)); % sample Pxys
+            replPxy = squeeze(mean(replPxy,1)); % average over tapers
+            replPxy = squeeze(nanmedian(real(replPxy),3))+...
+                1i*squeeze(nanmedian(imag(replPxy),3)); % median over time chunks
+
+            Pxys_out(:,:,i) = replPxy;
+
+        end
+        
 end
-
-try
-    %PROCEDURE 2 NAME
-    %code goes here
-catch err
-        % issue a warning
-    warning('fdbmtxsptrm:warningType',...
-        ['Warning: The following went wrong in Procedure 2 Name --\n' err.message ]);
-    %error handling code here
-
-        % or issue an error & exit function:
-    error('fdbmtxsptrm:errorType',...
-        ['Error: The following went wrong in Procedure 2 Name --\n' err.message ]);
-end
-
-
-%---------------------------------------
-% SUBFUNCTIONS
-%---------------------------------------
-
 
 %---------------------------------------
 % END CODE
