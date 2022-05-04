@@ -151,7 +151,7 @@ data_chunk = detrend(data(1:mwFs(1),:));
 
 fprintf('Computing multitaper cross-spectrum... ');
 [Pxy,freqs] = pkmtxsptrm(data_chunk,mtparams);
-Nfreqs = numel(freqs); frequencies = 1:Nfreqs;
+Nfreqs = numel(freqs);
 % preallocate Pxy with Nfreqs x Ntapers x Nchans x Nchans x Nmw
 Pxy(end,end,end,end,Nmw) = zeros(1,1,'like',complex(0)); 
 
@@ -190,124 +190,201 @@ end
 % ELSE MEAN ACROSS TAPERS
 %---------------------------------------
 
-if strcmp(gcohparams.inference,'fdb')
+switch gcohparams.inference
     
-    fprintf('Computing FDB... ')
+    case 'fdb'
+        fprintf('Computing FDB... ')
+
+        switch gcohparams.version
+            case 'window'
+                bootPxy = nan([Nfreqs Nchans Nchans Nmw*Niter],'like',complex(0));
+            case 'epoch'
+                bootPxy = nan([Nfreqs Nchans Nchans Niter],'like',complex(0));
+        end
+
+        for ff = 1:Nfreqs
+            bootPxy(ff,:,:,:) = fdb_mtx(squeeze(Pxy(ff,:,:,:,:)),Niter,gcohparams.version);
+        end
+        clear Pxy
+        Pxy = bootPxy; clear bootPxy
+        % becomes Nfreqs x Nchans x Nchans x (Nmw*Niter | Niter)
     
-    bootPxy = nan([Nfreqs Nchans Nchans Nmw*Niter],'like',complex(0));
-    
-    for ff = 1:Nfreqs
-        bootPxy(ff,:,:,:) = fdb_mtx(squeeze(Pxy(ff,:,:,:,:),Niter,gcohparams.version));
-    end
-    clear Pxy
-    Pxy = bootPxy; clear bootPxy
-    
-    disp('Done.')
-    
-elseif strcmp(gcohparams.inference,'none')
-    
-    fprintf('Computing mean across tapers... ')
-    
-    Pxy = squeeze(mean(Pxy,2)); % becomes Nfreqs x Nchans x Nchans x Nmw
-    
-    disp('Done.')
-    
+    case 'none'
+        fprintf('Computing mean across tapers... ')
+
+        Pxy = squeeze(mean(Pxy,2)); 
+        % becomes Nfreqs x Nchans x Nchans x Nmw
+
+        if strcmp(gcohparams.version,'epoch')
+
+            fprintf('Computing median across time... ')
+
+            Pxy = squeeze(nanmedian(real(Pxy),4)) + 1i*squeeze(nanmedian(imag(Pxy),4)); 
+            % becomes Nfreqs x Nchans x Nchans
+
+        end
 end
+
+disp('Done.')
 
 %---------------------------------------
 % RESHAPE CROSS-SPECTRA TO 3 DIMS
 %---------------------------------------
 
-if strcmp(gcohparams.inference,'none')
+if strcmp(gcohparams.inference,'none') && strcmp(gcohparams.version,'window')
     
     Pxy_reshaped = zeros(Nchans,Nchans,Nfreqs*Nmw);
     c=1;
     for qq = 1:Nmw
-        for loopfreq = frequencies
+        for loopfreq = 1:Nfreqs
             Pxy_reshaped(:,:,c)=squeeze(Pxy(loopfreq,:,:,qq));
             c=c+1;
         end
     end
-    clear Pxy;
     
-elseif strcmp(gcohparams.inference,'fdb')
+elseif strcmp(gcohparams.inference,'fdb') && strcmp(gcohparams.version,'window')
     
     Pxy_reshaped = zeros(Nchans,Nchans,Nfreqs*Nmw*Niter);
     c=1;
-    for qq = 1:Nmw
-        for loopfreq = frequencies
+    for qq = 1:Niter*Nmw
+        for loopfreq = 1:Nfreqs
             Pxy_reshaped(:,:,c)=squeeze(Pxy(loopfreq,:,:,qq));
             c=c+1;
         end
     end
-    clear Pxy;
     
-end 
+elseif strcmp(gcohparams.inference,'none') && strcmp(gcohparams.version,'epoch')
+    
+    Pxy_reshaped = zeros(Nchans,Nchans,Nfreqs);
+    c=1;
+    for loopfreq = 1:Nfreqs
+        Pxy_reshaped(:,:,c)=squeeze(Pxy(loopfreq,:,:));
+        c=c+1;
+    end
+
+elseif strcmp(gcohparams.inference,'fdb') && strcmp(gcohparams.version,'epoch')
+    
+    Pxy_reshaped = zeros(Nchans,Nchans,Nfreqs*Niter);
+    c=1;
+    for qq = 1:Niter
+        for loopfreq = 1:Nfreqs
+            Pxy_reshaped(:,:,c)=squeeze(Pxy(loopfreq,:,:,qq));
+            c=c+1;
+        end
+    end
+    
+end
+clear Pxy
 
 fprintf('Computing eigendecompositions... ')
+
 %---------------------------------------
-% RUN WINDOWED VERSION, NO FDB -- do first
+% PERFORM EIGENDECOMPOSITIONS
+%---------------------------------------
+
+diags = zeros(Nchans, size(Pxy_reshaped,3));
+eigvecs_r = zeros(Nchans,Nchans,size(Pxy_reshaped,3));
+eigvecs_l = zeros(Nchans,Nchans,size(Pxy_reshaped,3));
+nandat = find(squeeze(any(isnan(Pxy_reshaped),[1 2])));
+
+for i = 1:size(Pxy_reshaped,3)
+
+    if ismember(i,nandat)
+        continue
+    end
+
+    [U,S,V] = eig(Pxy_reshaped(:,:,i)); % such that U*S*V' = Pxy
+    [diags(:,i), svorder] = sort(diag(S),'descend');
+    U = U(:,svorder);
+    V = V(:,svorder);
+    eigvecs_r(:,:,i) = U;
+    eigvecs_l(:,:,i) = V;
+
+end
+
+%---------------------------------------
+% SORT OUTPUTS - WINDOWED VERSION, NO FDB
 %---------------------------------------
 
 if strcmp(gcohparams.inference,'none') && strcmp(gcohparams.version,'window')
 
-    diags = zeros(Nchans, length(Pxy_reshaped));
-    eigvecs_r = zeros(Nchans,Nchans,length(Pxy_reshaped));
-    eigvecs_l = zeros(Nchans,Nchans,length(Pxy_reshaped));
-    nandat = find(squeeze(any(any(isnan(Pxy_reshaped),1),2))); % improve
-
-    for i = 1:size(Pxy_reshaped,3)
-
-        if ismember(i,nandat)
-            continue
-        end
-
-        [U,S,V] = eig(Pxy_reshaped(:,:,i)); % such that U*S*V' = Pxy
-        [diags(:,i), svorder] = sort(diag(S),'descend');
-        U = U(:,svorder);
-        V = V(:,svorder);
-        eigvecs_r(:,:,i) = U;
-        eigvecs_l(:,:,i) = V;
-
-    end
-
-
-    eigenvalues = nan(Nmw,Nfreqs,Nchans);
-    eigenvectors_l = nan(Nmw,Nfreqs,Nchans,Nchans);
-    eigenvectors_r = nan(Nmw,Nfreqs,Nchans,Nchans);
+    % init outputs
+    eigenvalues = nan(Nchans,Nfreqs,Nmw);
+    eigenvectors_l = nan(Nchans,Nchans,Nfreqs,Nmw);
+    eigenvectors_r = nan(Nchans,Nchans,Nfreqs,Nmw);
+    
     c=1;
-    for qq = 1:Nmw
-        for loopfreq = frequencies
-            eigenvalues(qq,loopfreq,:) = diags(:,c);
-            eigenvectors_l(qq,loopfreq,:,:)=eigvecs_l(:,:,c);
-            eigenvectors_r(qq,loopfreq,:,:)=eigvecs_r(:,:,c);
+    for qq = 1:Nmw*Niter
+        for loopfreq = 1:Nfreqs
+            eigenvalues(:,loopfreq,qq) = diags(:,c);
+            eigenvectors_l(:,:,loopfreq,qq)=eigvecs_l(:,:,c);
+            eigenvectors_r(:,:,loopfreq,qq)=eigvecs_r(:,:,c);
             c=c+1;
         end
     end
 
 %---------------------------------------
-% RUN WINDOWED VERSION WITH npFDB -- do third
+% SORT OUTPUTS - WINDOWED VERSION, WITH npFDB
 %---------------------------------------
 
 elseif strcmp(gcohparams.inference,'fdb') && strcmp(gcohparams.version,'window')
-        
     
+    % init outputs
+    eigenvalues = nan(Nchans,Nfreqs,Nmw,Niter);
+    eigenvectors_l = nan(Nchans,Nchans,Nfreqs,Nmw,Niter);
+    eigenvectors_r = nan(Nchans,Nchans,Nfreqs,Nmw,Niter);
+    
+    c=1;
+    for i = 1:Niter
+        for mw = 1:Nmw
+            for loopfreq = 1:Nfreqs
+                eigenvalues(:,loopfreq,mw,i) = diags(:,c);
+                eigenvectors_l(:,:,loopfreq,mw,i)=eigvecs_l(:,:,c);
+                eigenvectors_r(:,:,loopfreq,mw,i)=eigvecs_r(:,:,c);
+                c=c+1;
+            end
+        end
+    end
     
 %---------------------------------------
-% RUN EPOCHED VERSION, NO FDB -- do last or not at all
+% SORT OUTPUTS - EPOCHED VERSION, NO FDB
 %---------------------------------------
 
-%elseif strcmp(gcohparams.inference,'none') && strcmp(gcohparams.version,'epoch')
+elseif strcmp(gcohparams.inference,'none') && strcmp(gcohparams.version,'epoch')
         
+    % init outputs
+    eigenvalues = nan(Nchans,Nfreqs);
+    eigenvectors_l = nan(Nchans,Nchans,Nfreqs);
+    eigenvectors_r = nan(Nchans,Nchans,Nfreqs);
     
+    c=1;
+    for loopfreq = 1:Nfreqs
+        eigenvalues(:,loopfreq) = diags(:,c);
+        eigenvectors_l(:,:,loopfreq)=eigvecs_l(:,:,c);
+        eigenvectors_r(:,:,loopfreq)=eigvecs_r(:,:,c);
+        c=c+1;
+    end
 
 %---------------------------------------
-% RUN EPOCHED VERSION WITH npFDB -- do second
+% SORT OUTPUTS - EPOCHED VERSION WITH npFDB
 %---------------------------------------
 
-%elseif strcmp(gcohparams.inference,'fdb') && strcmp(gcohparams.version,'epoch')
+elseif strcmp(gcohparams.inference,'fdb') && strcmp(gcohparams.version,'epoch')
         
+    % init outputs
+    eigenvalues = nan(Nchans,Nfreqs,Niter);
+    eigenvectors_l = nan(Nchans,Nchans,Nfreqs,Niter);
+    eigenvectors_r = nan(Nchans,Nchans,Nfreqs,Niter);
     
+    c=1;
+    for qq = 1:Niter
+        for loopfreq = 1:Nfreqs
+            eigenvalues(:,loopfreq,qq) = diags(:,c);
+            eigenvectors_l(:,:,loopfreq,qq)=eigvecs_l(:,:,c);
+            eigenvectors_r(:,:,loopfreq,qq)=eigvecs_r(:,:,c);
+            c=c+1;
+        end
+    end
 
 end
 
