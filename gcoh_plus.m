@@ -97,7 +97,11 @@ if ~isfield(gcohparams, 'parallel'); gcohparams.parallel = 0; end
 
 % check data
 mwFs = mtparams.movingwin*mtparams.Fs; % [n samples per window, n samples step size]
-assert(size(data,1) > mwFs(1)) % the data almost always has to be larger in samples than n_channels
+try
+    assert(size(data,1) >= mwFs(1)) % the data almost always has to be larger in samples than n_channels
+catch
+    return
+end
 Nchans = size(data,2); % number of channels
 
 % check T
@@ -314,7 +318,7 @@ if strcmp(gcohparams.inference,'none') && strcmp(gcohparams.version,'window')
     eigenvectors_r = nan(Nchans,Nchans,Nfreqs,Nmw);
     
     c=1;
-    for qq = 1:Nmw*Niter
+    for qq = 1:Nmw
         for loopfreq = 1:Nfreqs
             eigenvalues(:,loopfreq,qq) = diags(:,c);
             eigenvectors_l(:,:,loopfreq,qq)=eigvecs_l(:,:,c);
