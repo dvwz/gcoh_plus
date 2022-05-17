@@ -1,0 +1,95 @@
+%RECON_MTX Reconstruct cross-spectrum from selected eigenvalues and eigenvectors
+%Optional file header info (to give more details about the function than one line)
+%Optional file header info (to give more details about the function than one line)
+%
+% Usage:  
+%    [output1,output2] = recon_mtx(input1)
+%    [output1,output2] = recon_mtx(input1,input2)
+%
+% Inputs:
+%    input1 - Description
+%    input2 - Description
+%
+% Outputs:
+%    output1 - Description
+%    output2 - Description
+%
+% Example: 
+%    Line 1 of example
+%    Line 2 of example
+%    Line 3 of example
+%
+% Other m-files required: none
+% Other requirements: none
+%
+% See also: OTHER_FUNCTION_NAME1,  OTHER_FUNCTION_NAME2
+%
+% Copyright Apr-2020, David Zhou, dwzhou@mit.edu
+% Last revision 06-Apr-2020
+%------------------------------------------------
+ 
+function mtx_recon = recon_mtx(eigvecs_l,eigvals,eigvecs_r,modes)
+
+%---------------------------------------
+% PROCESS INPUTS
+%---------------------------------------
+
+if ~exist('modes','var') || isempty(modes)
+    modes = 1;
+end
+ 
+%VARARGIN
+switch length(size(eigvals))
+    case 2
+        disp('gcohout dims not implemented')
+        return
+    case 3 % Nch x Nfreqs x (Niter/Nmw)
+        Nch = size(eigvals,1);
+        Nfreqs = size(eigvals,2);
+        
+        mtx_recon = nan(size(eigvecs_l));
+    case 4
+        disp('gcohout dims not implemented')
+        return
+end
+
+%---------------------------------------
+% MAIN BODY
+%---------------------------------------
+
+switch length(size(eigvals))
+    case 2
+        disp('gcohout dims not implemented')
+        return
+        
+    case 3
+        for i = 1:size(eigvals,2)
+            for j = 1:size(eigvals,3)
+                
+                mtx_recon(:,:,i,j) = reconstruct_Pxy(squeeze(),...
+                        squeeze(),squeeze(),modes);
+                
+            end
+        end
+        
+    case 4
+        disp('gcohout dims not implemented')
+        return
+
+%---------------------------------------
+% SUBFUNCTIONS
+%---------------------------------------
+
+    function Pxy_recon = reconstruct_Pxy(U,S,V,modes)
+        
+        S_new = zeros(size(S));
+        S_new(modes) = S(modes);
+        S_new = eye(length(S)) .* S_new;
+        Pxy_recon = U * S_new * V';
+        
+    end
+
+%---------------------------------------
+% END CODE
+%---------------------------------------
+end

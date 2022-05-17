@@ -100,24 +100,26 @@ mwFs = mtparams.movingwin*mtparams.Fs; % [n samples per window, n samples step s
 try
     assert(size(data,1) >= mwFs(1)) % the data almost always has to be larger in samples than n_channels
 catch
+    gcohout = [];
     return
 end
 Nchans = size(data,2); % number of channels
+Niter = gcohparams.Niter;
 
 % check T
-T_samples = 1:size(data,1); % vector of sample indices
-T_sec = T_samples ./ mtparams.Fs; % time vector of samples in seconds
+T_samples = 1:size(data,1); % vector of start indices per window
+T_sec = T_samples ./ mtparams.Fs; % time vector of window starts in seconds
 if isempty(epochs)
-    T_winstart = T_samples(1:mwFs(2):end-mwFs(1)); % vector of window start indices
-    T_secout = T_sec(1:mwFs(2):end-mwFs(1)); % time vector of gcoh outputs in seconds
+    T_winstart = T_samples(1:mwFs(2):end-mwFs(1)+1); % vector of window start indices
+    T_secout = T_sec(1:mwFs(2):end-mwFs(1)+1); % time vector of gcoh outputs in seconds
 elseif size(epochs,2) == 2
     T_winstart = [];
     T_secout = [];
     for e = 1:size(epochs,1)
-        s_start = ceil(epochs(e,1)*mtparams.Fs); % the sample that the epoch should be started
-        s_end = floor(epochs(e,2)*mtparams.Fs); % the sample the the epoch should be ended
-        T_winstart = [T_winstart (s_start:mwFs(2):s_end-mwFs(1))];
-        T_secout = [T_secout ((s_start:mwFs(2):s_end-mwFs(1)) ./ mtparams.Fs)];
+        s_start = ceil(epochs(e,1)*mtparams.Fs)+1; % the sample that the epoch should be started
+        s_end = floor(epochs(e,2)*mtparams.Fs)+1; % the sample the the epoch should be ended
+        T_winstart = [T_winstart (s_start:mwFs(2):s_end-mwFs(1)+1)];
+        T_secout = [T_secout ((s_start:mwFs(2):s_end-mwFs(1)+1) ./ mtparams.Fs)];
     end
 end
 
@@ -141,6 +143,9 @@ gcohout = struct;
 data_windowed = nan(Nmw*mwFs(1),Nchans);
 di = 1;
 for e = 1:length(T_winstart)
+    if T_winstart(e)+mwFs(1)-1 > length(data)
+        continue
+    end
     data_windowed(di:di+mwFs(1)-1,:) = data(T_winstart(e):T_winstart(e)+mwFs(1)-1,:);
     di = di + mwFs(1);
 end
@@ -149,7 +154,6 @@ data = data_windowed; clear data_windowed;
 %---------------------------------------
 % COMPUTE CROSS-SPECTRUM WITH ALL TAPERS
 %---------------------------------------
-
 % first chunk of data, linear detrend
 data_chunk = detrend(data(1:mwFs(1),:));
 

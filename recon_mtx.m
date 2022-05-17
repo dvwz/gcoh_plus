@@ -28,83 +28,68 @@
 % Last revision 06-Apr-2020
 %------------------------------------------------
  
-function [outputs,varargout] = recon_mtx(inputs,varargin)
+function mtx_recon = recon_mtx(eigvecs_l,eigvals,eigvecs_r,modes)
 
 %---------------------------------------
 % PROCESS INPUTS
 %---------------------------------------
+
+if ~exist('modes','var') || isempty(modes)
+    modes = 1;
+end
  
 %VARARGIN
-switch length(varargin)
-    case 1
-        newvar1=varargin{1};
+switch length(size(eigvals))
     case 2
-        newvar1=varargin{1};
-        newvar2=varargin{2};
-   otherwise
-        newvar1=[];
-        newvar2=[];
+        disp('gcohout dims not implemented')
+        return
+    case 3 % Nch x Nfreqs x (Niter/Nmw)
+        Nch = size(eigvals,1);
+        Nfreqs = size(eigvals,2);
+        
+        mtx_recon = nan(size(eigvecs_l));
+    case 4
+        disp('gcohout dims not implemented')
+        return
 end
-
-%VARARGOUT
-switch length(varargout)
-    case 1
-        execute_procedure1=1;
-    case 2
-        execute_procedure1=1;
-        execute_procedure2=1;
-end
-
-%INPUT ERRORS
-if inputerror1
-    error('recon_mtx:inputError','Error:  Message goes here.');
-end
-
-%GLOBAL VARIABLES
-globalvar1=some_value;
-globalvar2=some_other_value;
-
-%OTHER INPUT PROCESSING
-    %insert here
-
 
 %---------------------------------------
-% MAIN BODY OF FUNCTION
+% MAIN BODY
 %---------------------------------------
 
-try 
-    %PROCEDURE 1 NAME
-    %code goes here
-catch err
-        % issue a warning
-    warning('recon_mtx:warningType',...
-        ['Warning: The following went wrong in Procedure 1 Name --\n' err.message ]);
-    %error handling code here
-
-        % or issue an error & exit function:
-    error('recon_mtx:errorType',...
-        ['Error: The following went wrong in Procedure 1 Name --\n' err.message ]);
-end
-
-try
-    %PROCEDURE 2 NAME
-    %code goes here
-catch err
-        % issue a warning
-    warning('recon_mtx:warningType',...
-        ['Warning: The following went wrong in Procedure 2 Name --\n' err.message ]);
-    %error handling code here
-
-        % or issue an error & exit function:
-    error('recon_mtx:errorType',...
-        ['Error: The following went wrong in Procedure 2 Name --\n' err.message ]);
-end
-
+switch length(size(eigvals))
+    case 2
+        disp('gcohout dims not implemented')
+        return
+        
+    case 3
+        for i = 1:size(eigvals,2)
+            for j = 1:size(eigvals,3)
+                
+                mtx_recon(:,:,i,j) = reconstruct_Pxy(eigvecs_l(:,:,i,j),...
+                                                     eigvals(:,i,j),...
+                                                     eigvecs_r(:,:,i,j),...
+                                                     modes);
+                
+            end
+        end
+        
+    case 4
+        disp('gcohout dims not implemented')
+        return
 
 %---------------------------------------
 % SUBFUNCTIONS
 %---------------------------------------
 
+    function Pxy_recon = reconstruct_Pxy(U,S,V,modes)
+        
+        S_new = zeros(size(S));
+        S_new(modes) = S(modes);
+        S_new = eye(length(S)) .* S_new;
+        Pxy_recon = U * S_new * V';
+        
+    end
 
 %---------------------------------------
 % END CODE
