@@ -27,8 +27,8 @@
 % Copyright Apr-2020, David Zhou, dwzhou@mit.edu
 % Last revision 06-Apr-2020
 %------------------------------------------------
- 
-function mtx_recon = recon_mtx(eigvecs_l,eigvals,eigvecs_r,modes)
+
+function Pxy_recon = recon_mtx(eigvecs_l,eigvals,eigvecs_r,modes)
 
 %---------------------------------------
 % PROCESS INPUTS
@@ -47,7 +47,7 @@ switch length(size(eigvals))
         Nch = size(eigvals,1);
         Nfreqs = size(eigvals,2);
         
-        mtx_recon = nan(size(eigvecs_l));
+        Pxy_recon = nan(size(eigvecs_l));
     case 4
         disp('gcohout dims not implemented')
         return
@@ -66,7 +66,7 @@ switch length(size(eigvals))
         for i = 1:size(eigvals,2)
             for j = 1:size(eigvals,3)
                 
-                mtx_recon(:,:,i,j) = reconstruct_Pxy(eigvecs_l(:,:,i,j),...
+                Pxy_recon(:,:,i,j) = reconstruct_Pxy(eigvecs_l(:,:,i,j),...
                                                      eigvals(:,i,j),...
                                                      eigvecs_r(:,:,i,j),...
                                                      modes);
@@ -77,6 +77,8 @@ switch length(size(eigvals))
     case 4
         disp('gcohout dims not implemented')
         return
+        
+end
 
 %---------------------------------------
 % SUBFUNCTIONS
