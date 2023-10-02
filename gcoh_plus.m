@@ -19,8 +19,9 @@
 %    gcohparams (optional) - structure with fields savedir, outputdir,
 %        version ('epoch': average across time samples, 'window': per
 %        multitaper time window), inference ('none', 'fdb', 'null'), 
-%        parallel ('true' | 'false'), Niter
-%
+%        parallel ('true' | 'false'), step ('mtx', 'all'), 
+%        Niter
+%        
 % Outputs:
 %    eigenvectors_l - left eigenvectors (in form Nchans x Nchans x ...)
 %    eigenvectors_r - right eigenvectors (in form Nchans x Nchans x ...)
@@ -131,6 +132,8 @@ times = T_secout;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 gcohout = struct;
+gcohout.mtparams = mtparams;
+gcohout.gcohparams = gcohparams;
 
 %% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% MAIN BODY %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -154,16 +157,17 @@ data = data_windowed; clear data_windowed;
 %---------------------------------------
 % COMPUTE CROSS-SPECTRUM WITH ALL TAPERS
 %---------------------------------------
-% first chunk of data, linear detrend
-data_chunk = detrend(data(1:mwFs(1),:));
 
+% Determine pre-allocation sizes with first chunk of data
+data_chunk = detrend(data(1:mwFs(1),:));
 fprintf('Computing multitaper cross-spectrum... ');
 [Pxy,freqs] = pkmtxsptrm(data_chunk,mtparams);
 Nfreqs = numel(freqs);
-% preallocate Pxy with Nfreqs x Ntapers x Nchans x Nchans x Nmw
+
+% Preallocate Pxy with Nfreqs x Ntapers x Nchans x Nchans x Nmw
 Pxy(end,end,end,end,Nmw) = zeros(1,1,'like',complex(0)); 
 
-% multi-taper spectrum, to infinity and beyond!
+% Compute detrended cross-spectra per window
 for qq = 1:Nmw
     
     qp = qq-1;
@@ -234,6 +238,14 @@ switch gcohparams.inference
 end
 
 disp('Done.')
+
+if strcmp(gcohparams.step, 'mtx')
+    gcohout.times = times;
+    gcohout.freqs = freqs;
+    gcohout.cross_spectrum = Pxy;
+
+    return
+end
 
 %---------------------------------------
 % RESHAPE CROSS-SPECTRA TO 3 DIMS
