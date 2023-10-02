@@ -1,6 +1,6 @@
 function angmat = angdist(eigvecs,modes,ploton)
 %ANGDIST Computes pairwise angular distances between eigenvectors in a list
-% Inputs: eigvecs - eigenvectors as columns with additional dimensions (Nchans x Nchans x Nmw...)
+% Inputs: eigvecs - eigenvectors as columns with additional dimensions (Nchans x Nchans x Nmw/Nsubs x Niter...)
 
 if ~exist('modes','var') || isempty(modes)
     modes = 1;
