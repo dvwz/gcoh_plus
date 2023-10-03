@@ -84,6 +84,7 @@ if ~isfield(gcohparams, 'savedir'); gcohparams.savedir = pwd; end
 if ~isfield(gcohparams, 'outputdir'); gcohparams.outputdir = pwd; end
 if ~isfield(gcohparams, 'inference'); gcohparams.inference = 'none'; end
 if ~isfield(gcohparams, 'version'); gcohparams.version = 'window'; end
+if ~isfield(gcohparams, 'step'); gcohparams.step = 'all'; end
 if ~isfield(gcohparams, 'Niter')
     switch gcohparams.inference
         case 'none' % just one svd per mtx
