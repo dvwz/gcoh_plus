@@ -243,7 +243,7 @@ disp('Done.')
 if strcmp(gcohparams.step, 'mtx')
     gcohout.times = times;
     gcohout.freqs = freqs;
-    gcohout.cross_spectrum = Pxy;
+    gcohout.cross_spectra = Pxy;
 
     return
 end
