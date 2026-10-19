@@ -7,8 +7,7 @@
 %    Settings: # of components to compute, multitaper settings
 %    
 % Usage:
-%    [singvals, singvecs_l, singvecs_r, gcohmat, times, freqs, gcohsig, mc_samples] = gcoh_plus(data, Fs, T, mw, mtparams, Niter)
-%    [output1,output2] = gcoh_plus(input1,input2)
+%    gcohout = gcoh_plus(data, epochs, mtparams, gcohparams)
 %
 % Inputs:
 %    data - time series (in form nsamples x nchannels)
@@ -23,16 +22,19 @@
 %        Niter
 %        
 % Outputs:
+%    gcohout - structure with the fields below (or cross_spectra, times
+%        and freqs only, if gcohparams.step is 'mtx')
 %    eigenvectors_l - left eigenvectors (in form Nchans x Nchans x ...)
 %    eigenvectors_r - right eigenvectors (in form Nchans x Nchans x ...)
 %    eigenvalues - eigenvalues (in form Nchans x ...)
 %    times - time axis vector for plotting
 %    freqs - frequency axis vector for plotting
 %
-% Example: 
-%    Line 1 of example
-%    Line 2 of example
-%    Line 3 of example
+% Example:
+%    mtparams = struct('Fs', 250, 'tapers', [3 5], 'fpass', [0 50], ...
+%                      'pad', -1, 'movingwin', [3 3]);
+%    gcohparams = struct('version', 'epoch', 'inference', 'fdb', 'Niter', 200);
+%    gcohout = gcoh_plus(data, [], mtparams, gcohparams);
 %
 % Other m-files required: functions of gcoh_plus library
 % Other requirements: Chronux toolbox
@@ -61,14 +63,14 @@ end
 % default multitaper parameters for Chronux
 if ~isfield(mtparams, 'pad'); mtparams.pad = 0; end
 if ~isfield(mtparams, 'tapers'); mtparams.tapers = [3 2]; end
-if ~isfield(mtparams, 'fpass'); mtparams.fpass = [0,(Fs/2)]; end
+if ~isfield(mtparams, 'fpass'); mtparams.fpass = [0,(mtparams.Fs/2)]; end
 if ~isfield(mtparams, 'err'); mtparams.err = 0; end
 if ~isfield(mtparams, 'trialave'); mtparams.trialave = 0; end
 if ~isfield(mtparams, 'Fs');
     mtparams.Fs = input('Fs is not present in mtparams. Please enter sampling rate: ');
 end
 if ~isfield(mtparams, 'movingwin')
-    if Fs <= 25
+    if mtparams.Fs <= 25
         mtparams.movingwin = [20 20];
     else
         mtparams.movingwin = [3 3];
